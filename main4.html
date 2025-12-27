@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<title>Board Game Timer</title>
+
+<style>
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: #111;
+  color: #fff;
+  text-align: center;
+}
+
+h1 {
+  margin: 15px 0;
+}
+
+.controls {
+  margin-bottom: 10px;
+}
+
+.players {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  padding: 16px;
+}
+
+.player {
+  border-radius: 16px;
+  padding: 20px;
+  min-height: 180px;
+  cursor: grab;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.player.dragging {
+  opacity: 0.6;
+  transform: scale(0.95);
+}
+
+.player.active {
+  box-shadow: 0 0 0 6px #fff inset;
+}
+
+.name {
+  font-size: 22px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: center;
+  font-weight: bold;
+}
+
+.timer {
+  font-size: 56px;
+  font-weight: bold;
+}
+
+.color-picker {
+  margin-top: 8px;
+}
+
+select {
+  font-size: 14px;
+}
+
+button, input {
+  font-size: 16px;
+  margin: 4px;
+}
+
+.player.passed {
+  opacity: 0.5;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>⏱ Board Game Timer</h1>
+
+<div class="controls">
+  Czas na gracza (sekundy):
+  <input type="number" id="startTime" value="120" onchange="previewTime()">
+  <span id="timeFeedback" style="margin-left:8px; opacity:0;"></span>
+  <button onclick="startRound()">▶ Start</button>
+  <button onclick="nextPlayer()">⏭ Następny</button>
+  <button onclick="stopTimer()">⏹ Stop</button>
+  <button onclick="newRound()">🔄 Nowa runda</button>
+</div>
+
+<div class="players" id="players"></div>
+
+<script>
+const COLORS = {
+  biały: "#ffffff",
+  czarny: "#000000",
+  niebieski: "#2196f3",
+  czerwony: "#f44336",
+  żółty: "#ffeb3b",
+  zielony: "#4caf50",
+  brązowy: "#795548",
+  różowy: "#e91e63",
+  pomarańczowy: "#ff9800",
+  szary: "#9e9e9e"
+};
+
+let players = [];
+let currentIndex = 0;
+let timer = null;
+let passCounter = 0;
+
+
+// INIT
+function init() {
+  players = [];
+  const colorNames = Object.keys(COLORS);
+
+  for (let i = 0; i < 6; i++) {
+  players.push({
+  name: "Gracz " + (i + 1),
+  time: 120,
+  color: colorNames[i % colorNames.length],
+  passedAt: null   // <-- NOWE
+});
+  }
+  render();
+}
+
+// START
+function startRound() {
+  stopTimer();
+  const startTime = parseInt(document.getElementById("startTime").value);
+  players.forEach(p => {
+    if (p.time <= 0) p.time = startTime;
+  });
+  startTimer();
+  render();
+}
+
+
+function startTimer() {
+  timer = setInterval(() => {
+    const p = players[currentIndex];
+    if (p.time > 0) p.time--;
+    else nextPlayer();
+    render();
+  }, 1000);
+}
+
+function stopTimer() {
+  if (timer) clearInterval(timer);
+  timer = null;
+}
+
+// NEXT
+function nextPlayer() {
+  if (players.every(p => p.passedAt !== null)) {
+    // wszyscy spasowali, nic nie zmieniamy
+    return;
+  }
+
+  do {
+    currentIndex = (currentIndex + 1) % players.length;
+  } while (players[currentIndex].passedAt !== null);
+
+  render();
+}
+
+
+function passPlayer(index) {
+  if (players[index].passedAt !== null) return;
+
+  players[index].passedAt = passCounter++;
+  
+  // jeśli pasuje aktywny gracz, przejdź dalej
+  if (index === currentIndex) {
+    nextPlayer();
+  }
+
+  render();
+}
+
+
+// NEW ROUND
+function newRound() {
+  stopTimer();
+
+  const startTime = parseInt(document.getElementById("startTime").value);
+
+  const passed = players.filter(p => p.passedAt !== null)
+                        .sort((a, b) => a.passedAt - b.passedAt);
+
+  const notPassed = players.filter(p => p.passedAt === null);
+
+  players = [...passed, ...notPassed];
+
+  players.forEach(p => {
+    p.time = startTime;
+    p.passedAt = null;
+  });
+
+  passCounter = 0;
+  currentIndex = 0;
+
+  render();
+}
+
+
+
+function previewTime() {
+  const value = parseInt(document.getElementById("startTime").value);
+  if (isNaN(value) || value <= 0) return;
+
+  players.forEach(p => p.time = value);
+  currentIndex = 0;
+
+  const feedback = document.getElementById("timeFeedback");
+  feedback.textContent = "✔ czas ustawiony";
+  feedback.style.opacity = 1;
+
+  setTimeout(() => feedback.style.opacity = 0, 1200);
+  render();
+}
+
+
+// RENDER
+function render() {
+  const container = document.getElementById("players");
+  container.innerHTML = "";
+
+  players.forEach((p, index) => {
+    const div = document.createElement("div");
+    div.className = "player";
+    div.draggable = true;
+    div.style.background = COLORS[p.color];
+    div.style.color = p.color === "biały" ? "#000" : "#fff";
+
+    if (index === currentIndex) div.classList.add("active");
+    if (p.passedAt !== null) div.classList.add("passed");
+
+
+    div.innerHTML = `
+      <input class="name" value="${p.name}"
+        onchange="players[${index}].name=this.value">
+        <div class="timer">${formatTime(p.time)}</div>
+        <button onclick="passPlayer(${index})" ${p.passedAt !== null ? "disabled" : ""}>
+                Pas
+        </button>
+      <div class="color-picker">
+        <select onchange="setColor(${index}, this.value)">
+          ${Object.keys(COLORS).map(c =>
+            `<option ${c===p.color?"selected":""}>${c}</option>`
+          ).join("")}
+        </select>
+      </div>
+    `;
+
+    enableDrag(div, index);
+    container.appendChild(div);
+  });
+}
+
+// DRAG & DROP
+function enableDrag(el, index) {
+  el.addEventListener("dragstart", () => {
+    el.classList.add("dragging");
+    el.dataset.index = index;
+  });
+
+  el.addEventListener("dragend", () => {
+    el.classList.remove("dragging");
+  });
+
+  el.addEventListener("dragover", e => e.preventDefault());
+
+  el.addEventListener("drop", e => {
+    e.preventDefault();
+    const from = parseInt(document.querySelector(".dragging").dataset.index);
+    const to = index;
+    players.splice(to, 0, players.splice(from, 1)[0]);
+
+    if (currentIndex === from) currentIndex = to;
+    else if (from < currentIndex && to >= currentIndex) currentIndex--;
+    else if (from > currentIndex && to <= currentIndex) currentIndex++;
+
+    render();
+  });
+}
+
+// COLOR
+function setColor(i, color) {
+  players[i].color = color;
+  render();
+}
+
+// FORMAT
+function formatTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+init();
+</script>
+
+</body>
+</html>
