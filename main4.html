@@ -94,6 +94,8 @@ button, input {
   <button onclick="nextPlayer()">⏭ Następny</button>
   <button onclick="stopTimer()">⏹ Stop</button>
   <button onclick="newRound()">🔄 Nowa runda</button>
+  <button onclick="toggleFullscreen()">🖥️ Pełny ekran</button>
+
 </div>
 
 <div class="players" id="players"></div>
@@ -213,6 +215,15 @@ function newRound() {
   render();
 }
 
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(err => {
+      alert(`Błąd podczas przechodzenia w tryb pełnoekranowy: ${err.message}`);
+    });
+  } else {
+    document.exitFullscreen();
+  }
+}
 
 
 function previewTime() {
